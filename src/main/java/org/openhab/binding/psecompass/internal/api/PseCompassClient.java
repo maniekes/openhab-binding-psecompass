@@ -74,6 +74,9 @@ public final class PseCompassClient {
                     || !row.start().equals(start.plusSeconds(i * 3600L))) {
                 throw new IOException("Invalid PSE schedule row");
             }
+            if (row.usageForecast() < 0 || row.usageForecast() > 3) {
+                throw new IOException("Unknown PSE usage_fcst: " + row.usageForecast());
+            }
         }
         return List.copyOf(rows);
     }

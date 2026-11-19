@@ -21,6 +21,14 @@ class PseCompassClientTest {
     static final LocalDate DAY = LocalDate.of(2026, 11, 19);
 
     @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(ints = {-1, 4, 99})
+    void rejectsUnknownRecommendationCodes(int code) {
+        String body = schedule(DAY).replace("\"usage_fcst\":0", "\"usage_fcst\":" + code);
+        var error = assertThrows(java.io.IOException.class, () -> fetchResponse(200, body, DAY));
+        assertTrue(error.getMessage().contains("Unknown PSE usage_fcst"));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.CsvSource({"business_date,wrong_day", "usage_fcst,missing_code",
             "publication_ts_utc,missing_publication", "dtime_utc,missing_timestamp"})
     void requiredFieldsCannotBeSilentlyDropped(String field, String replacement) {

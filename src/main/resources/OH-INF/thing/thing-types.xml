@@ -4,6 +4,58 @@
     xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
     <thing-type id="compass">
         <label>PSE Energy Compass</label>
-        <description>Polish electricity consumption guidance. API-only development skeleton; channels and polling are not yet implemented.</description>
+        <description>Read-only Polish electricity consumption guidance from PSE.</description>
+        <channels>
+            <channel id="current-zone" typeId="zone"><label>Current Zone</label></channel>
+            <channel id="next-zone" typeId="zone"><label>Next Distinct Zone</label></channel>
+            <channel id="next-change" typeId="next-change"/>
+            <channel id="schedule" typeId="schedule"/>
+            <channel id="last-successful-update" typeId="last-successful-update"/>
+            <channel id="zone-changed" typeId="zone-changed"/>
+        </channels>
+        <config-description>
+            <parameter name="refreshInterval" type="integer" min="1" max="1440" unit="min">
+                <label>Refresh Interval</label>
+                <description>Delay between API polls in minutes. Cached boundaries are evaluated separately.</description>
+                <default>15</default>
+            </parameter>
+        </config-description>
     </thing-type>
+    <channel-type id="zone">
+        <item-type>Number</item-type>
+        <label>Zone</label>
+        <description>Raw PSE consumption recommendation code.</description>
+        <state readOnly="true" pattern="%s">
+            <options>
+                <option value="0">Recommended Usage</option>
+                <option value="1">Normal Usage</option>
+                <option value="2">Recommended Saving</option>
+                <option value="3">Required Reduction</option>
+            </options>
+        </state>
+    </channel-type>
+    <channel-type id="next-change">
+        <item-type>DateTime</item-type>
+        <label>Next Change</label>
+        <description>Start of the next distinct zone in the contiguous cached schedule.</description>
+        <state readOnly="true" pattern="%1$tF %1$tT"/>
+    </channel-type>
+    <channel-type id="schedule">
+        <item-type>String</item-type>
+        <label>Schedule</label>
+        <description>JSON intervals with UTC start, exclusive end and raw zone; expired intervals are omitted.</description>
+        <state readOnly="true"/>
+    </channel-type>
+    <channel-type id="last-successful-update">
+        <item-type>DateTime</item-type>
+        <label>Last Successful Update</label>
+        <description>Time a non-empty validated daily report was last fetched, not the publication time.</description>
+        <state readOnly="true" pattern="%1$tF %1$tT"/>
+    </channel-type>
+    <channel-type id="zone-changed">
+        <kind>trigger</kind>
+        <label>Zone Changed</label>
+        <description>Observed cached boundary change; event payload is the new raw zone code.</description>
+        <event><options><option value="0"/><option value="1"/><option value="2"/><option value="3"/></options></event>
+    </channel-type>
 </thing:thing-descriptions>
