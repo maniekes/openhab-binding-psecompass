@@ -10,7 +10,7 @@ policy, create Items or discover Things. Unit tests and a public-API smoke test 
 Compiling the bundle is not proof of OSGi resolution or acceptance on a running openHAB server;
 installation and runtime verification are separate steps.
 
-The current release candidate is **0.1.0-rc.1**, targeting openHAB **5.2.4 / Java 21**.
+The current release candidate is **0.1.0-rc.2**, targeting openHAB **5.2.4 / Java 21**.
 It is a prerelease, not a claim of compatibility with every openHAB 5.x version.
 
 ## Thing and channels
@@ -113,7 +113,7 @@ Use **JDK 21** and **Maven 3.9.6 or newer**:
 mvn -B -ntp clean verify
 ```
 
-Output: `target/org.openhab.binding.psecompass-0.1.0-rc.1.jar`.
+Output: `target/org.openhab.binding.psecompass-0.1.0-rc.2.jar`.
 The default tests use loopback HTTP fixtures and deterministic clocks/schedulers. Opt-in tests
 exercise the real public API and the production handler constructor/shared scheduler with recorded
 channel callbacks (not an OSGi container):

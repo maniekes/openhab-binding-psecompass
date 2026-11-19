@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-rc.2
+
+- Permit manual workflow dispatch on an existing version tag to build and create its draft release.
+- Same runtime code as rc.1. The rc.1 source tag was preserved after its initial tag workflow did not start; it was not published as a release.
+
 ## 0.1.0-rc.1
 
 First release candidate for openHAB 5.2.4 and Java 21. This remains a prerelease.

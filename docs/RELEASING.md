@@ -30,7 +30,7 @@ Do not delete/recreate Things or rename Items just to replace the JAR.
    JAR filenames also carry the commit. CI artifacts expire after 30 days.
    Manual dispatch can optionally run the public PSE API tests; these are not
    required for ordinary offline unit tests and are not OSGi runtime tests.
-4. A tag push creates a **draft** GitHub Release from that same build artifact,
+4. A tag push (or manual workflow dispatch targeting that tag) creates a **draft** GitHub Release from that same build artifact,
    without rebuilding. Hyphenated versions are marked prerelease. Only this job
    has `contents: write`; nothing deploys automatically. If a draft already
    exists, a rerun fails rather than silently replacing assets. Inspect the
