@@ -49,7 +49,7 @@ jobs:
           set -euo pipefail
           tag=""
           if [[ "$REF_TYPE" == tag ]]; then tag="$REF_NAME"; fi
-          jars=(target/org.openhab.binding.psecompass-*.jar)
+          jars=(target/psecompass-*.jar)
           [[ ${#jars[@]} == 1 && -f "${jars[0]}" ]]
           python3 scripts/verification/verify_bundle.py "${jars[0]}" --tag "$tag"
           mkdir dist

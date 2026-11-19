@@ -2,6 +2,8 @@ PSE Energy Compass Binding is an independent community project.
 It is not produced or maintained by the openHAB project or by PSE.
 
 Project source: https://github.com/maniekes/openhab-binding-psecompass
+Maven coordinates: pl.klimonda.openhab.binding:psecompass
+Bundle and Java namespace: pl.klimonda.openhab.binding.psecompass
 
 == License and provenance
 

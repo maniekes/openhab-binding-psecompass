@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = Path(__file__).with_name("verify_bundle.py")
-SYMBOL = "org.openhab.binding.psecompass"
+SYMBOL = "pl.klimonda.openhab.binding.psecompass"
 FACTORY = SYMBOL + ".internal.PseCompassHandlerFactory"
 DS = "OSGI-INF/" + FACTORY + ".xml"
 
@@ -124,6 +124,22 @@ class BundleTest(unittest.TestCase):
 
     def test_tag_must_match_pom(self):
         self.run_verifier(tag="v0.2.0", error="tag must match")
+
+    def test_legacy_namespace_rejected(self):
+        legacy = b"org.openhab.binding.psecompass"
+        for name, content in (
+                ("legacy.txt", legacy),
+                ("legacy.txt", legacy.replace(b".", b"/")),
+                (legacy.decode().replace(".", "/") + "/Legacy.class", bytes.fromhex("cafebabe00000041"))):
+            with self.subTest(name=name, content=content):
+                self.entries[name] = content
+                self.run_verifier(error="legacy namespace")
+                del self.entries[name]
+
+    def test_legacy_bundle_identity_rejected(self):
+        self.entries["META-INF/MANIFEST.MF"] = self.entries["META-INF/MANIFEST.MF"].replace(
+            SYMBOL.encode(), b"org.openhab.binding.psecompass")
+        self.run_verifier(error="bundle symbolic name")
 
 
 if __name__ == "__main__":

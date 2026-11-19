@@ -2,9 +2,9 @@
  * Copyright (c) 2026 Contributors to the openHAB project
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.binding.psecompass.internal;
+package pl.klimonda.openhab.binding.psecompass.internal;
 
-import static org.openhab.binding.psecompass.internal.PseCompassBindingConstants.*;
+import static pl.klimonda.openhab.binding.psecompass.internal.PseCompassBindingConstants.*;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.psecompass.internal.api.PseCompassClient;
-import org.openhab.binding.psecompass.internal.api.PseRow;
+import pl.klimonda.openhab.binding.psecompass.internal.api.PseCompassClient;
+import pl.klimonda.openhab.binding.psecompass.internal.api.PseRow;
 import org.openhab.core.library.types.DateTimeType;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.StringType;

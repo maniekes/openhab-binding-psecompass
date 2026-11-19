@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Contributors to the openHAB project
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.binding.psecompass.internal;
+package pl.klimonda.openhab.binding.psecompass.internal;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -15,7 +15,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.psecompass.internal.api.PseRow;
+import pl.klimonda.openhab.binding.psecompass.internal.api.PseRow;
 
 /** In-memory daily cache. Access is serialized by the handler, never by the network request. */
 @NonNullByDefault

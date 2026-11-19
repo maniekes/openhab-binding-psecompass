@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>org.openhab.binding</groupId>
-  <artifactId>org.openhab.binding.psecompass</artifactId>
-  <version>0.1.0-rc.2</version>
+  <groupId>pl.klimonda.openhab.binding</groupId>
+  <artifactId>psecompass</artifactId>
+  <version>0.2.0-rc.1</version>
   <name>PSE Energy Compass Binding</name>
   <properties>
     <maven.compiler.release>21</maven.compiler.release>
@@ -41,10 +41,10 @@
         <groupId>biz.aQute.bnd</groupId><artifactId>bnd-maven-plugin</artifactId><version>7.1.0</version>
         <executions><execution><goals><goal>bnd-process</goal></goals></execution></executions>
         <configuration><bnd><![CDATA[
-Bundle-SymbolicName: ${project.artifactId}
+Bundle-SymbolicName: ${project.groupId}.${project.artifactId}
 Bundle-Name: PSE Energy Compass Binding
 Bundle-License: EPL-2.0
-Private-Package: org.openhab.binding.psecompass.*
+Private-Package: pl.klimonda.openhab.binding.psecompass.*
 Import-Package: org.openhab.*;version="[5.2,6)", *
 -noimportjava: true
 -includeresource: LICENSE, NOTICE

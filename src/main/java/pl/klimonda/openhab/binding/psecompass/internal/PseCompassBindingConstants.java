@@ -2,7 +2,7 @@
  * Copyright (c) 2026 Contributors to the openHAB project
  * SPDX-License-Identifier: EPL-2.0
  */
-package org.openhab.binding.psecompass.internal;
+package pl.klimonda.openhab.binding.psecompass.internal;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.thing.ThingTypeUID;

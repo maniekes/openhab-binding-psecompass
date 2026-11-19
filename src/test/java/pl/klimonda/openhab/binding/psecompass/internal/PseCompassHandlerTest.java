@@ -1,7 +1,7 @@
-package org.openhab.binding.psecompass.internal;
+package pl.klimonda.openhab.binding.psecompass.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.openhab.binding.psecompass.internal.PseScheduleTest.*;
+import static pl.klimonda.openhab.binding.psecompass.internal.PseScheduleTest.*;
 
 import java.time.*;
 import java.util.*;

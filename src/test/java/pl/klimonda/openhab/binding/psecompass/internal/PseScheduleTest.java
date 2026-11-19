@@ -1,11 +1,11 @@
-package org.openhab.binding.psecompass.internal;
+package pl.klimonda.openhab.binding.psecompass.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.Test;
-import org.openhab.binding.psecompass.internal.api.PseRow;
+import pl.klimonda.openhab.binding.psecompass.internal.api.PseRow;
 
 class PseScheduleTest {
     static final Instant START = Instant.parse("2026-11-18T23:00:00Z");

@@ -7,11 +7,44 @@ The tested runtime baseline is **openHAB 5.2.4 with Java 21**. The POM targets
 Each candidate still needs runtime acceptance. CI checks packaging, not an OSGi
 container, the live provider's future availability, or household rules.
 
-Preserve the existing `psecompass:compass:<id>` Thing UID, configuration, channel
+For updates within the new bundle identity, preserve the existing
+`psecompass:compass:<id>` Thing UID, configuration, channel
 IDs and Item links during updates. The contract is five read-only state channels
 (`current-zone`/`next-zone`: Number, `next-change`/`last-successful-update`:
 DateTime, `schedule`: String), plus the `zone-changed` trigger with no Item.
 Do not delete/recreate Things or rename Items just to replace the JAR.
+
+## Namespace migration from 0.1.x
+
+Version **0.2.0-rc.1** deliberately changes Maven coordinates to
+`pl.klimonda.openhab.binding:psecompass:0.2.0-rc.1`, Java packages and the actual
+OSGi Bundle-SymbolicName to `pl.klimonda.openhab.binding.psecompass`.
+The binding ID `psecompass`, Thing type and channel contract do not change.
+No legacy bundle/package alias is supplied. Published old tags remain immutable.
+This section is a migration procedure, not evidence of completed runtime acceptance.
+
+1. In an authorized maintenance window, back up the installed old JAR/checksum,
+   bundle identity/status and the relevant Thing, Items, links and page definitions.
+2. Remove the old JAR from the watched `addons` directory and uninstall the old
+   bundle. Verify that its old bundle identity and handler service are absent
+   before installing the new JAR. An atomic overwrite alone is not sufficient
+   proof of migration across different bundle identities.
+3. Install only `psecompass-0.2.0-rc.1.jar` (or a fixed `psecompass.jar` filename),
+   using the checksum/staging precautions below. Verify the new symbolic name,
+   OSGi version `0.2.0.rc1`, activation and DS service wiring.
+4. If intentionally replacing a test setup, recreate the scoped Thing as
+   `psecompass:compass:poland` and use `PSECompass_CurrentZone`,
+   `PSECompass_NextZone`, `PSECompass_NextChange`, `PSECompass_Schedule` and
+   `PSECompass_LastUpdate`, with the links in README. Replace references to old
+   test Items in the page and any affected rules; remove obsolete test entities
+   only within the approved scope. This cleanup is optional for installations
+   already using their intended Thing/Items, not a change to the binding contract.
+5. Verify ONLINE, a successful fetch after activation, each channel/link, Polish
+   labels and rendered page references. Record the exact artifact hash and
+   observed results; do not infer runtime success from the build or old states.
+6. To roll back across this identity change, uninstall/remove the new bundle
+   first, restore the saved old JAR and any intentionally changed configuration,
+   then verify old bundle/Thing/link health. Never install both identities together.
 
 ## Build and draft a release
 
@@ -46,11 +79,14 @@ Local packaging checks (Python standard library only):
 ```sh
 mvn -B -ntp clean verify
 python3 -m unittest discover -s scripts/verification -v
-python3 scripts/verification/verify_bundle.py target/org.openhab.binding.psecompass-*.jar
+python3 scripts/verification/verify_bundle.py target/psecompass-*.jar
 # For a release candidate, append --tag vX.Y.Z (matching the actual POM).
 ```
 
 ## Install, update and rollback
+
+The following replacement procedure applies within the new bundle identity;
+for 0.1.x, complete the explicit uninstall/install migration above instead.
 
 Use the installation's actual `addons` directory and its existing ownership;
 no production paths or credentials belong in this repository.
@@ -60,7 +96,7 @@ no production paths or credentials belong in this repository.
    Items and relevant logs. Retain a verified copy of the previous JAR **outside
    `addons`**, together with its checksum. Back up configuration as usual.
 2. Keep **one** installed PSE Compass JAR. Prefer a fixed installed filename
-   such as `org.openhab.binding.psecompass.jar`, independent of asset version.
+   such as `psecompass.jar`, independent of asset version.
    Stage the verified new bytes on the same filesystem as `addons`, with a
    non-`.jar` suffix (for example `.jar.pending`), and recheck the checksum and
    readability by openHAB before an atomic rename over the installed filename.

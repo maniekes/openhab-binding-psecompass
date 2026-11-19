@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.0-rc.1
+
+- Breaking namespace migration: Maven coordinates `pl.klimonda.openhab.binding:psecompass`, Java packages and actual OSGi Bundle-SymbolicName `pl.klimonda.openhab.binding.psecompass`. No legacy compatibility alias; uninstall the old bundle before installing this one.
+- Keep binding ID `psecompass`, Thing/channel contracts and platform dependencies unchanged.
+- Update packaging checks, CI artifact paths and migration instructions; align example Items with `PSECompass_*` and Thing `psecompass:compass:poland`.
+- Reject legacy own-namespace entries/references in built bundles. Runtime migration and acceptance remain separate, authorized steps.
+
 ## 0.1.0-rc.2
 
 - Permit manual workflow dispatch on an existing version tag to build and create its draft release.

@@ -6,7 +6,7 @@ import sys
 import xml.etree.ElementTree as ET
 import zipfile
 
-SYMBOL = "org.openhab.binding.psecompass"
+SYMBOL = "pl.klimonda.openhab.binding.psecompass"
 
 
 def require(condition, message):
@@ -34,6 +34,10 @@ def verify(jar, pom, tag):
         names = archive.namelist()
         require(len(names) == len(set(names)), "duplicate ZIP entry")
         for name in names:
+            content = archive.read(name)
+            legacy = b"org.openhab.binding.psecompass"
+            require(all(token not in name.encode() and token not in content
+                        for token in (legacy, legacy.replace(b".", b"/"))), "legacy namespace: " + name)
             require(not name.lower().endswith(".jar") and
                     (not name.endswith(".class") or name.startswith(SYMBOL.replace(".", "/") + "/")), "embedded dependency: " + name)
             if name.endswith(".class"):

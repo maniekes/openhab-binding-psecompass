@@ -10,8 +10,21 @@ policy, create Items or discover Things. Unit tests and a public-API smoke test 
 Compiling the bundle is not proof of OSGi resolution or acceptance on a running openHAB server;
 installation and runtime verification are separate steps.
 
-The current release candidate is **0.1.0-rc.2**, targeting openHAB **5.2.4 / Java 21**.
+The current source candidate is **0.2.0-rc.1**, targeting openHAB **5.2.4 / Java 21**.
 It is a prerelease, not a claim of compatibility with every openHAB 5.x version.
+
+Maven coordinates: `pl.klimonda.openhab.binding:psecompass:0.2.0-rc.1`.
+The Java package prefix and actual OSGi Bundle-SymbolicName are
+`pl.klimonda.openhab.binding.psecompass`; the binding ID remains `psecompass`.
+These coordinates identify the artifact, not publication to a Maven repository.
+
+**Breaking migration from 0.1.x:** this is a different bundle identity, not an
+in-place update of the old bundle. Uninstall the old bundle and remove its JAR
+from `addons` before installing the new JAR; never run both together. There is
+no legacy package or bundle compatibility alias. Back up the old JAR and Thing,
+Item/link and page configuration first, then follow the explicit
+[migration and verification instructions](docs/RELEASING.md#namespace-migration-from-01x).
+These are instructions, not a claim that any running installation has been migrated.
 
 ## Thing and channels
 
@@ -50,11 +63,11 @@ invalid daily report, never converted into one of the known recommendations.
 Example Items (create manually; no device-control rule is supplied):
 
 ```java
-Number PSE_CurrentZone "PSE current zone" { channel="psecompass:compass:poland:current-zone" }
-Number PSE_NextZone "PSE next distinct zone" { channel="psecompass:compass:poland:next-zone" }
-DateTime PSE_NextChange "PSE next change [%1$tF %1$tT]" { channel="psecompass:compass:poland:next-change" }
-String PSE_Schedule "PSE schedule" { channel="psecompass:compass:poland:schedule" }
-DateTime PSE_LastSuccess "PSE last successful update [%1$tF %1$tT]" { channel="psecompass:compass:poland:last-successful-update" }
+Number PSECompass_CurrentZone "PSE current zone" { channel="psecompass:compass:poland:current-zone" }
+Number PSECompass_NextZone "PSE next distinct zone" { channel="psecompass:compass:poland:next-zone" }
+DateTime PSECompass_NextChange "PSE next change [%1$tF %1$tT]" { channel="psecompass:compass:poland:next-change" }
+String PSECompass_Schedule "PSE schedule" { channel="psecompass:compass:poland:schedule" }
+DateTime PSECompass_LastUpdate "PSE last successful update [%1$tF %1$tT]" { channel="psecompass:compass:poland:last-successful-update" }
 ```
 
 Example schedule shape (illustrative, not live data):
@@ -113,7 +126,7 @@ Use **JDK 21** and **Maven 3.9.6 or newer**:
 mvn -B -ntp clean verify
 ```
 
-Output: `target/org.openhab.binding.psecompass-0.1.0-rc.2.jar`.
+Output: `target/psecompass-0.2.0-rc.1.jar`.
 The default tests use loopback HTTP fixtures and deterministic clocks/schedulers. Opt-in tests
 exercise the real public API and the production handler constructor/shared scheduler with recorded
 channel callbacks (not an OSGi container):
@@ -139,7 +152,7 @@ service wiring. The Thing XML was validated against the official openHAB XSD.
 
 ## API contract
 
-`org.openhab.binding.psecompass.internal.api.PseCompassClient`:
+`pl.klimonda.openhab.binding.psecompass.internal.api.PseCompassClient`:
 
 ```java
 PseCompassClient(HttpClient sharedHttpClient)

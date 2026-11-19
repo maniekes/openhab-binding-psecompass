@@ -1,4 +1,4 @@
-package org.openhab.binding.psecompass.internal;
+package pl.klimonda.openhab.binding.psecompass.internal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
