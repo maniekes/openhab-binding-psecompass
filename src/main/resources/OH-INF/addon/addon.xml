@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<addon:addon id="psecompass" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:addon="https://openhab.org/schemas/addon/v1.0.0"
+    xsi:schemaLocation="https://openhab.org/schemas/addon/v1.0.0 https://openhab.org/schemas/addon-1.0.0.xsd">
+    <type>binding</type>
+    <name>PSE Energy Compass</name>
+    <description>Read-only access to PSE Energy Compass daily reports.</description>
+    <connection>cloud</connection>
+</addon:addon>
