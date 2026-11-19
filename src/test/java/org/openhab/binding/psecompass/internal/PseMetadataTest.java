@@ -26,7 +26,7 @@ class PseMetadataTest {
             assertEquals("trigger", xpath.evaluate("//channel-type[@id='zone-changed']/kind", document));
             assertEquals("true", xpath.evaluate("//channel-type[@id='zone']/state/@readOnly", document));
             String[] english = { "Recommended Usage", "Normal Usage", "Recommended Saving", "Required Reduction" };
-            String[] polish = { "Zalecane użytkowanie", "Normalne użytkowanie", "Zalecane oszczędzanie", "Wymagane ograniczenie" };
+            String[] polish = { "Zalecane użytkowanie", "Normalne użytkowanie", "Zalecane oszczędzanie", "Wymagane ograniczanie" };
             Properties pl = new Properties();
             try (var translations = new InputStreamReader(getClass().getResourceAsStream(
                     "/OH-INF/i18n/psecompass_pl.properties"), StandardCharsets.UTF_8)) {

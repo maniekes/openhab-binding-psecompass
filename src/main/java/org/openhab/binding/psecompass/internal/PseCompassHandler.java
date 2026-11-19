@@ -4,6 +4,8 @@
  */
 package org.openhab.binding.psecompass.internal;
 
+import static org.openhab.binding.psecompass.internal.PseCompassBindingConstants.*;
+
 import java.io.IOException;
 import java.time.Clock;
 import java.time.Instant;
@@ -14,6 +16,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.psecompass.internal.api.PseCompassClient;
 import org.openhab.binding.psecompass.internal.api.PseRow;
 import org.openhab.core.library.types.DateTimeType;
@@ -27,8 +31,11 @@ import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
 import org.openhab.core.types.UnDefType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Read-only integration; household control policy belongs to external rules. */
+@NonNullByDefault
 public class PseCompassHandler extends BaseThingHandler {
     @FunctionalInterface
     interface Fetcher {
@@ -36,24 +43,27 @@ public class PseCompassHandler extends BaseThingHandler {
     }
 
     private static final ZoneId WARSAW = ZoneId.of("Europe/Warsaw");
+    private final Logger logger = LoggerFactory.getLogger(PseCompassHandler.class);
     private final Fetcher fetcher;
     private final Clock clock;
     private final ScheduledExecutorService executor;
     private PseSchedule cache = new PseSchedule();
     private boolean active;
     private long generation;
-    private ScheduledFuture<?> polling;
-    private ScheduledFuture<?> boundaries;
-    private Instant nextBoundary;
-    private Instant evaluatedAt;
-    private Instant lastSuccess;
-    private String fetchError;
+    private @Nullable ScheduledFuture<?> polling;
+    private @Nullable ScheduledFuture<?> boundaries;
+    private @Nullable Instant nextBoundary;
+    private @Nullable Instant evaluatedAt;
+    private @Nullable Instant lastSuccess;
+    private @Nullable String fetchError;
+    private boolean publicationPending;
+    private boolean cycleCompleted;
 
     public PseCompassHandler(Thing thing, PseCompassClient client) {
         this(thing, client::fetch, Clock.systemUTC(), null);
     }
 
-    PseCompassHandler(Thing thing, Fetcher fetcher, Clock clock, ScheduledExecutorService executor) {
+    PseCompassHandler(Thing thing, Fetcher fetcher, Clock clock, @Nullable ScheduledExecutorService executor) {
         super(thing);
         this.fetcher = fetcher;
         this.clock = clock;
@@ -65,14 +75,14 @@ public class PseCompassHandler extends BaseThingHandler {
         dispose();
         int minutes;
         try {
-            Object configured = getConfig().get("refreshInterval");
+            Object configured = getConfig().get(CONFIG_REFRESH_INTERVAL);
             minutes = configured == null ? 15 : new java.math.BigDecimal(configured.toString()).intValueExact();
             if (minutes < 1 || minutes > 1440) {
                 throw new IllegalArgumentException();
             }
         } catch (IllegalArgumentException | ArithmeticException e) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
-                    "refreshInterval must be an integer from 1 to 1440 minutes");
+                    CONFIG_REFRESH_INTERVAL + " must be an integer from 1 to 1440 minutes");
             return;
         }
         active = true;
@@ -82,9 +92,20 @@ public class PseCompassHandler extends BaseThingHandler {
         fetchError = null;
         nextBoundary = null;
         evaluatedAt = null;
+        publicationPending = false;
+        cycleCompleted = false;
         updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Waiting for PSE schedule");
-        polling = executor.scheduleWithFixedDelay(() -> poll(run), 0, minutes, TimeUnit.MINUTES);
-        boundaries = executor.scheduleWithFixedDelay(() -> reevaluate(run), 1, 1, TimeUnit.SECONDS);
+        polling = executor.scheduleWithFixedDelay(() -> runSafely(() -> poll(run)), 0, minutes, TimeUnit.MINUTES);
+        boundaries = executor.scheduleWithFixedDelay(() -> runSafely(() -> reevaluate(run)), 1, 1, TimeUnit.SECONDS);
+    }
+
+    private void runSafely(Runnable task) {
+        try {
+            task.run();
+        } catch (RuntimeException e) {
+            // An escaping exception would cancel a fixed-delay job permanently.
+            logger.debug("PSE scheduled update failed for {}", getThing().getUID(), e);
+        }
     }
 
     private synchronized boolean isActive(long run) {
@@ -96,9 +117,13 @@ public class PseCompassHandler extends BaseThingHandler {
             return;
         }
         Instant now = clock.instant();
-        if ((nextBoundary != null && !now.isBefore(nextBoundary))
+        reevaluate(now);
+    }
+
+    private void reevaluate(Instant now) {
+        if (publicationPending || (nextBoundary != null && !now.isBefore(nextBoundary))
                 || (evaluatedAt != null && now.isBefore(evaluatedAt))) {
-            publish(true);
+            publish(now, true);
         }
     }
 
@@ -109,25 +134,29 @@ public class PseCompassHandler extends BaseThingHandler {
             if (!isActive(run)) {
                 return;
             }
+            List<PseRow> rows;
             try {
-                var rows = fetcher.fetch(day);
-                synchronized (this) {
-                    if (!isActive(run)) {
-                        return;
-                    }
-                    if (!rows.isEmpty()) {
-                        // Observe elapsed cached boundaries before accepting forecast revisions.
-                        reevaluate(run);
-                        cache.replace(day, rows);
-                        lastSuccess = clock.instant();
-                        publish(false);
-                    }
-                }
+                rows = fetcher.fetch(day);
             } catch (IOException | RuntimeException e) {
-                error = "PSE " + day + ": " + e.getMessage();
+                error = error == null ? "PSE fetch failed: " + day : error + ", " + day;
+                logger.debug("PSE fetch failed for {} on {}", getThing().getUID(), day, e);
+                continue;
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return;
+            }
+            synchronized (this) {
+                if (!isActive(run)) {
+                    return;
+                }
+                if (!rows.isEmpty()) {
+                    // Observe elapsed cached boundaries before accepting forecast revisions.
+                    Instant now = clock.instant();
+                    reevaluate(now);
+                    cache.replace(day, rows);
+                    lastSuccess = now;
+                    publish(now, false);
+                }
             }
         }
         synchronized (this) {
@@ -135,28 +164,36 @@ public class PseCompassHandler extends BaseThingHandler {
                 return;
             }
             fetchError = error;
-            publish(true);
+            cycleCompleted = true;
+            publish(clock.instant(), true);
         }
     }
 
-    private void publish(boolean boundaryObservation) {
-        var view = cache.evaluate(clock.instant(), boundaryObservation);
-        evaluatedAt = clock.instant();
+    private void publish(Instant now, boolean boundaryObservation) {
+        // Retry state/status publication, never replay an event whose delivery is uncertain.
+        publicationPending = true;
+        var view = cache.evaluate(now, boundaryObservation);
+        evaluatedAt = now;
         nextBoundary = view.boundary();
-        updateState("current-zone", view.current() == null ? UnDefType.UNDEF : new DecimalType(view.current()));
-        updateState("next-zone", view.next() == null ? UnDefType.UNDEF : new DecimalType(view.next()));
-        updateState("next-change", view.nextChange() == null ? UnDefType.UNDEF : new DateTimeType(view.nextChange()));
-        updateState("schedule", new StringType(view.json()));
-        updateState("last-successful-update", lastSuccess == null ? UnDefType.UNDEF : new DateTimeType(lastSuccess));
+        updateState(CHANNEL_CURRENT_ZONE, view.current() == null ? UnDefType.UNDEF : new DecimalType(view.current()));
+        updateState(CHANNEL_NEXT_ZONE, view.next() == null ? UnDefType.UNDEF : new DecimalType(view.next()));
+        updateState(CHANNEL_NEXT_CHANGE, view.nextChange() == null ? UnDefType.UNDEF : new DateTimeType(view.nextChange()));
+        updateState(CHANNEL_SCHEDULE, new StringType(view.json()));
+        updateState(CHANNEL_LAST_SUCCESSFUL_UPDATE, lastSuccess == null ? UnDefType.UNDEF : new DateTimeType(lastSuccess));
         if (view.event() != null) {
-            triggerChannel("zone-changed", view.event());
+            triggerChannel(CHANNEL_ZONE_CHANGED, view.event());
         }
-        if (fetchError != null || view.current() == null) {
+        if (!cycleCompleted) {
+            updateStatus(ThingStatus.UNKNOWN, ThingStatusDetail.NONE, "Waiting for PSE schedule");
+        } else if (fetchError != null) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
-                    fetchError != null ? fetchError : "No currently valid PSE schedule");
+                    fetchError);
+        } else if (view.current() == null) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, "No currently valid PSE schedule");
         } else {
             updateStatus(ThingStatus.ONLINE, ThingStatusDetail.NONE, null);
         }
+        publicationPending = false;
     }
 
     @Override
@@ -177,7 +214,7 @@ public class PseCompassHandler extends BaseThingHandler {
     @Override
     public synchronized void handleCommand(ChannelUID channelUID, Command command) {
         if (active && command == RefreshType.REFRESH) {
-            publish(true);
+            publish(clock.instant(), true);
         }
     }
 }

@@ -11,11 +11,14 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
 
 /** PSE *_utc fields omit their offset; never interpret them in the host's timezone. */
+@NonNullByDefault
 public final class PseUtcTimestampAdapter implements JsonDeserializer<Instant> {
     private static final DateTimeFormatter FORMAT = new DateTimeFormatterBuilder()
             .append(DateTimeFormatter.ISO_LOCAL_DATE).appendLiteral(' ').append(DateTimeFormatter.ISO_LOCAL_TIME)

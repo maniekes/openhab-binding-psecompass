@@ -4,6 +4,8 @@
  */
 package org.openhab.binding.psecompass.internal;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.psecompass.internal.api.PseCompassClient;
 import org.openhab.core.io.net.http.HttpClientFactory;
 import org.openhab.core.thing.Thing;
@@ -16,6 +18,7 @@ import org.osgi.service.component.annotations.Component;
 import org.osgi.service.component.annotations.Reference;
 
 @Component(service = ThingHandlerFactory.class, configurationPid = "binding.psecompass")
+@NonNullByDefault
 public class PseCompassHandlerFactory extends BaseThingHandlerFactory {
     private final HttpClientFactory httpClientFactory;
 
@@ -30,7 +33,7 @@ public class PseCompassHandlerFactory extends BaseThingHandlerFactory {
     }
 
     @Override
-    protected ThingHandler createHandler(Thing thing) {
+    protected @Nullable ThingHandler createHandler(Thing thing) {
         if (supportsThingType(thing.getThingTypeUID())) {
             return new PseCompassHandler(thing, new PseCompassClient(httpClientFactory.getCommonHttpClient()));
         }

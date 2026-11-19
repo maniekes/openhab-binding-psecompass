@@ -47,6 +47,182 @@ class PseCompassHandlerTest {
         @Override protected void triggerChannel(String channel, String event) { events.add(channel + ":" + event); }
     }
 
+    /** Exercise BaseThingHandler's actual callback path without a mock framework. */
+    static class RecordingCallback implements java.lang.reflect.InvocationHandler {
+        final Map<String, State> states = new HashMap<>();
+        final List<ThingStatusInfo> statuses = new ArrayList<>();
+        final List<String> events = new ArrayList<>();
+        String failNext;
+
+        void attach(PseCompassHandler handler) {
+            var type = org.openhab.core.thing.binding.ThingHandlerCallback.class;
+            handler.setCallback((org.openhab.core.thing.binding.ThingHandlerCallback)
+                    java.lang.reflect.Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] { type }, this));
+        }
+
+        @Override public Object invoke(Object proxy, java.lang.reflect.Method method, Object[] args) {
+            switch (method.getName()) {
+                case "stateUpdated" -> states.put(((ChannelUID) args[0]).getId(), (State) args[1]);
+                case "statusUpdated" -> statuses.add((ThingStatusInfo) args[1]);
+                case "channelTriggered" -> events.add((String) args[2]);
+                default -> throw new AssertionError("Unexpected callback: " + method.getName());
+            }
+            if (method.getName().equals(failNext)) {
+                failNext = null;
+                throw new IllegalStateException("callback failed after delivery");
+            }
+            return null;
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"0,stateUpdated", "0,statusUpdated", "0,channelTriggered",
+            "1,stateUpdated", "1,statusUpdated", "1,channelTriggered"})
+    void callbackFailureCannotCancelJobsOrBecomeFetchFailure(int job, String method) {
+        var clock = new MutableClock();
+        var executor = new ManualScheduler();
+        var handler = new PseCompassHandler(ThingBuilder.create(PseCompassBindingConstants.THING_TYPE_COMPASS, "test").build(),
+                day -> day.equals(DAY) ? rows(0, 2, 3) : List.of(), clock, executor);
+        var callback = new RecordingCallback();
+        callback.attach(handler);
+        try {
+            handler.initialize();
+            executor.jobs.get(0).run();
+            callback.failNext = method;
+            clock.now = START.plusSeconds(3600);
+            assertDoesNotThrow(() -> executor.jobs.get(job).run());
+            callback.states.clear();
+            callback.statuses.clear();
+            executor.jobs.get(1).run();
+            assertEquals(new DecimalType(2), callback.states.get("current-zone"), "Retry publication before next hour");
+            assertEquals(ThingStatus.ONLINE, callback.statuses.getLast().getStatus());
+            assertTrue(callback.events.size() <= 1, "Never replay an uncertain trigger delivery");
+            clock.now = START.plusSeconds(7200);
+            executor.jobs.get(1).run();
+            assertEquals("3", callback.events.getLast(), "Future boundary events must survive");
+            executor.jobs.get(0).run();
+            assertEquals(ThingStatus.ONLINE, callback.statuses.getLast().getStatus());
+        } finally {
+            handler.dispose();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void clockCrossingInsideCacheReplacementCannotConsumeBoundary() {
+        var clock = new MutableClock() {
+            int reads;
+            boolean ticking;
+            @Override public Instant instant() {
+                return ticking ? START.plusSeconds(++reads <= 2 ? 3599 : 3600) : now;
+            }
+        };
+        var executor = new ManualScheduler();
+        var handler = new RecordingHandler(day -> day.equals(DAY) ? rows(0, 2) : List.of(), clock, executor);
+        try {
+            handler.initialize();
+            executor.jobs.get(0).run();
+            clock.ticking = true;
+            executor.jobs.get(0).run();
+            executor.jobs.get(1).run();
+            assertEquals(List.of("zone-changed:2"), handler.events);
+        } finally {
+            handler.dispose();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void statusWaitsForCompletedCycleWhileDayDataPublishesPromptly() {
+        var clock = new MutableClock();
+        var executor = new ManualScheduler();
+        var callback = new RecordingCallback();
+        var cycle = new java.util.concurrent.atomic.AtomicInteger();
+        var handler = new PseCompassHandler(ThingBuilder.create(PseCompassBindingConstants.THING_TYPE_COMPASS, "test").build(),
+                day -> {
+                    if (day.equals(DAY)) {
+                        if (cycle.get() == 2) { throw new java.io.IOException("today unavailable"); }
+                        return rows(0, 2);
+                    }
+                    assertEquals(new DecimalType(0), callback.states.get("current-zone"), "Publish today before tomorrow fetch");
+                    ThingStatus expected = cycle.get() == 0 ? ThingStatus.UNKNOWN : ThingStatus.OFFLINE;
+                    assertTrue(callback.statuses.stream().allMatch(s -> s.getStatus() == expected),
+                            "No status bounce before the cycle completes: " + callback.statuses);
+                    if (cycle.get() < 3) { throw new java.io.IOException("tomorrow unavailable"); }
+                    return List.of();
+                }, clock, executor);
+        callback.attach(handler);
+        try {
+            handler.initialize();
+            handler.handleCommand(new ChannelUID(handler.getThing().getUID(), "current-zone"),
+                    org.openhab.core.types.RefreshType.REFRESH);
+            assertTrue(callback.statuses.stream().allMatch(s -> s.getStatus() == ThingStatus.UNKNOWN));
+            for (int i = 0; i < 4; i++) {
+                cycle.set(i);
+                callback.statuses.clear();
+                executor.jobs.get(0).run();
+                var status = callback.statuses.getLast();
+                assertEquals(i == 3 ? ThingStatus.ONLINE : ThingStatus.OFFLINE, status.getStatus());
+                if (i < 3) {
+                    assertEquals(ThingStatusDetail.COMMUNICATION_ERROR, status.getStatusDetail());
+                    assertTrue(status.getDescription().contains(DAY.plusDays(1).toString()));
+                    if (i == 2) { assertTrue(status.getDescription().contains(DAY.toString()), "Retain both failure dates"); }
+                }
+            }
+        } finally {
+            handler.dispose();
+            executor.shutdownNow();
+        }
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    void completedCycleStatusDistinguishesFailureFromMissingCoverage(boolean failure, boolean coverage) {
+        var executor = new ManualScheduler();
+        var callback = new RecordingCallback();
+        var handler = new PseCompassHandler(ThingBuilder.create(PseCompassBindingConstants.THING_TYPE_COMPASS, "test").build(),
+                day -> {
+                    if (day.equals(DAY)) { return coverage ? rows(0, 2) : List.of(); }
+                    if (failure) { throw new java.io.IOException("unavailable"); }
+                    return List.of();
+                }, new MutableClock(), executor);
+        callback.attach(handler);
+        try {
+            handler.initialize();
+            executor.jobs.get(0).run();
+            var status = callback.statuses.getLast();
+            assertEquals(!failure && coverage ? ThingStatus.ONLINE : ThingStatus.OFFLINE, status.getStatus());
+            assertEquals(failure ? ThingStatusDetail.COMMUNICATION_ERROR : ThingStatusDetail.NONE, status.getStatusDetail());
+            assertEquals(coverage ? new DecimalType(0) : org.openhab.core.types.UnDefType.UNDEF,
+                    callback.states.get("current-zone"));
+            if (failure) { assertTrue(status.getDescription().contains(DAY.plusDays(1).toString())); }
+            if (!failure && !coverage) { assertTrue(status.getDescription().contains("No currently valid")); }
+        } finally {
+            handler.dispose();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void refreshUsesOneInstantEvenWhenClockMovesBackwards() {
+        var clock = new MutableClock() {
+            int reads;
+            @Override public Instant instant() { reads++; return now.minusSeconds(reads); }
+        };
+        var executor = new ManualScheduler();
+        var handler = new RecordingHandler(day -> rows(0, 2), clock, executor);
+        try {
+            handler.initialize();
+            clock.reads = 0;
+            handler.handleCommand(new ChannelUID(handler.getThing().getUID(), "current-zone"),
+                    org.openhab.core.types.RefreshType.REFRESH);
+            assertEquals(1, clock.reads, "Evaluation and evaluatedAt must share the same instant");
+        } finally {
+            handler.dispose();
+            executor.shutdownNow();
+        }
+    }
+
     @Test
     void cachedBoundariesAdvanceDuringOutageAndExpireWithoutRecoveryEvents() {
         var clock = new MutableClock();

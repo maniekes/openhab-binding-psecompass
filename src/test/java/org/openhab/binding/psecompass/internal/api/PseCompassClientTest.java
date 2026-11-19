@@ -21,6 +21,27 @@ class PseCompassClientTest {
     static final LocalDate DAY = LocalDate.of(2026, 11, 19);
 
     @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"3.00000000000000001", "\"3\"", "true"})
+    void rejectsNonIntegerCodeTokens(String token) {
+        String body = schedule(DAY).replace("\"usage_fcst\":0", "\"usage_fcst\":" + token);
+        assertThrows(java.io.IOException.class, () -> fetchResponse(200, body, DAY));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"\"true\"", "1"})
+    void rejectsNonBooleanActiveTokens(String token) {
+        assertThrows(java.io.IOException.class,
+                () -> fetchResponse(200, schedule(DAY).replace("true", token), DAY));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"{value:[]}", "{'value':[]}", "{/*comment*/\"value\":[]}",
+            "{\"value\":[]} trailing", "{\"value\":[];}", "{\"value\":[],}"})
+    void rejectsNonJsonSyntax(String body) {
+        assertThrows(java.io.IOException.class, () -> fetchResponse(200, body, DAY));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(ints = {-1, 4, 99})
     void rejectsUnknownRecommendationCodes(int code) {
         String body = schedule(DAY).replace("\"usage_fcst\":0", "\"usage_fcst\":" + code);

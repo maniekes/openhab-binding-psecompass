@@ -10,6 +10,9 @@ policy, create Items or discover Things. Unit tests and a public-API smoke test 
 Compiling the bundle is not proof of OSGi resolution or acceptance on a running openHAB server;
 installation and runtime verification are separate steps.
 
+The current release candidate is **0.1.0-rc.1**, targeting openHAB **5.2.4 / Java 21**.
+It is a prerelease, not a claim of compatibility with every openHAB 5.x version.
+
 ## Thing and channels
 
 ```java
@@ -37,7 +40,7 @@ included (display depends on the UI using the state description):
 | 0 | Recommended Usage | Zalecane użytkowanie |
 | 1 | Normal Usage | Normalne użytkowanie |
 | 2 | Recommended Saving | Zalecane oszczędzanie |
-| 3 | Required Reduction | Wymagane ograniczenie |
+| 3 | Required Reduction | Wymagane ograniczanie |
 
 These meanings were checked against PSE's official Energetyczny Kompas frontend, whose status
 mapping is `0 → recommended`, `1 → normal`, `2 → warning`, `3 → danger`. The API OpenAPI schema
@@ -73,6 +76,12 @@ Example schedule shape (illustrative, not live data):
   cached values remain valid. A later successful polling cycle with valid current coverage returns
   it `ONLINE`. No valid current interval means `current-zone`, `next-zone` and `next-change` are
   `UNDEF`; future-only intervals can remain in `schedule` and activate at their start.
+- Until the first polling cycle finishes, the Thing stays `UNKNOWN`, including on `REFRESH`.
+  Communication status is based on the last completed cycle, not an intermediate daily response.
+  A successful fetch without current coverage uses `OFFLINE / NONE`, not a communication error.
+  Debug logging includes the causes of fetch/publication failures. Unexpected publication
+  exceptions do not terminate repeating jobs: state/status publication is retried on a later
+  evaluation, but a trigger with uncertain delivery is not replayed automatically.
 - No next **distinct** known zone means `next-zone` and `next-change` are `UNDEF`, not a fabricated
   midnight change. Look-ahead does not cross gaps. JSON timestamps are UTC; DateTime Items may
   be displayed in the openHAB/UI timezone. DST days contain 23 or 25 real hourly intervals.
@@ -83,6 +92,12 @@ Example schedule shape (illustrative, not live data):
   by an observed interval with a different code. No event is emitted on startup, cache recovery,
   a same-zone hourly boundary, a forecast revision, or skipped/gapped intervals. Missed transitions
   are not replayed. A polling result cannot hide a boundary already present in the old cache.
+- If a revised forecast arrives at a boundary, the elapsed boundary is observed against the
+  previous cache before the revision is applied. The trigger can therefore carry the old plan's
+  code while `current-zone` subsequently reflects the revision. Use Item state-change rules when
+  every change, including forecast corrections, matters; the trigger specifically reports time
+  transitions. A system-clock rollback followed by crossing the same UTC boundary again can
+  produce another observed transition; this is not an exactly-once event stream.
 - `REFRESH` republishes the cache evaluated at the current time; it does **not** perform HTTP I/O
   or force a remote poll. Other commands are ignored. All owned tasks are cancelled on disposal;
   late responses and callbacks from a previous initialization are discarded. The shared HTTP
@@ -90,13 +105,15 @@ Example schedule shape (illustrative, not live data):
 
 ## Build
 
+See [release, installation and rollback instructions](docs/RELEASING.md).
+
 Use **JDK 21** and **Maven 3.9.6 or newer**:
 
 ```sh
 mvn -B -ntp clean verify
 ```
 
-Output: `target/org.openhab.binding.psecompass-0.1.0-SNAPSHOT.jar`.
+Output: `target/org.openhab.binding.psecompass-0.1.0-rc.1.jar`.
 The default tests use loopback HTTP fixtures and deterministic clocks/schedulers. Opt-in tests
 exercise the real public API and the production handler constructor/shared scheduler with recorded
 channel callbacks (not an OSGi container):
@@ -153,6 +170,8 @@ consecutive hourly records: 23, 24 or 25 hours according to `Europe/Warsaw` DST 
 duplicate, inactive or wrong-day rows fail explicitly. Any nonblank `nextLink` fails explicitly
 rather than silently returning a truncated schedule or following an arbitrary URL.
 The result is immutable. HTTP/protocol failures are `IOException`; interruption propagates.
+JSON syntax and the code/active field types are checked strictly: string-coerced numbers or
+booleans and non-integral codes are rejected rather than silently converted.
 
 `usage_fcst` remains the raw PSE code (0–3). This is consumption guidance, not a price or tariff.
 

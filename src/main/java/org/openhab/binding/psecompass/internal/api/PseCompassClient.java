@@ -13,15 +13,37 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonParseException;
+import com.google.gson.Strictness;
 
 /** Read-only client; the caller owns the shared HTTP client lifecycle. */
+@NonNullByDefault
 public final class PseCompassClient {
     public static final URI ENDPOINT = URI.create("https://api.raporty.pse.pl/api/pdgsz");
     private final HttpClient httpClient;
     private final URI endpoint;
-    private final Gson gson = new Gson();
+    private final Gson gson = new GsonBuilder().setStrictness(Strictness.STRICT)
+            .registerTypeAdapter(Integer.class, (JsonDeserializer<Integer>) (json, type, context) -> {
+                if (!json.isJsonPrimitive() || !json.getAsJsonPrimitive().isNumber()) {
+                    throw new JsonParseException("Expected an integer PSE usage_fcst");
+                }
+                try {
+                    return json.getAsBigDecimal().intValueExact();
+                } catch (ArithmeticException | NumberFormatException e) {
+                    throw new JsonParseException("Expected an exact integer PSE usage_fcst", e);
+                }
+            }).registerTypeAdapter(Boolean.class, (JsonDeserializer<Boolean>) (json, type, context) -> {
+                if (!json.isJsonPrimitive() || !json.getAsJsonPrimitive().isBoolean()) {
+                    throw new JsonParseException("Expected a boolean PSE is_active");
+                }
+                return json.getAsBoolean();
+            }).create();
 
     public PseCompassClient(HttpClient httpClient) {
         this(httpClient, ENDPOINT);
@@ -49,7 +71,7 @@ public final class PseCompassClient {
         }
     }
 
-    private List<PseRow> validate(PseResponse response, LocalDate day) throws IOException {
+    private List<PseRow> validate(@Nullable PseResponse response, LocalDate day) throws IOException {
         if (response == null || response.value() == null) {
             throw new IOException("Missing PSE report value");
         }

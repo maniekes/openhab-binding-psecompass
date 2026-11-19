@@ -13,14 +13,18 @@ import java.util.Map;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.binding.psecompass.internal.api.PseRow;
 
 /** In-memory daily cache. Access is serialized by the handler, never by the network request. */
+@NonNullByDefault
 final class PseSchedule {
     private final Map<LocalDate, List<PseRow>> days = new HashMap<>();
-    private PseRow observed;
+    private @Nullable PseRow observed;
 
-    record View(Integer current, Integer next, Instant nextChange, String json, String event, Instant boundary) {
+    record View(@Nullable Integer current, @Nullable Integer next, @Nullable Instant nextChange, String json,
+            @Nullable String event, @Nullable Instant boundary) {
     }
 
     void replace(LocalDate day, List<PseRow> rows) {

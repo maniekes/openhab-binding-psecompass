@@ -1,0 +1,103 @@
+name: Build and draft release
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      live_tests:
+        description: Run opt-in public PSE API tests (requires network)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build and test
+        run: mvn -B -ntp clean verify
+      - name: Verifier regression tests
+        run: python3 -m unittest discover -s scripts/verification -v
+      - name: Optional live API tests
+        if: github.event_name == 'workflow_dispatch' && inputs.live_tests
+        run: mvn -B -ntp -Dpse.live=true -Dtest=PseLiveTest,PseCompassHandlerLiveTest test
+      - name: Verify and stage the tested JAR
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          tag=""
+          if [[ "$REF_TYPE" == tag ]]; then tag="$REF_NAME"; fi
+          jars=(target/org.openhab.binding.psecompass-*.jar)
+          [[ ${#jars[@]} == 1 && -f "${jars[0]}" ]]
+          python3 scripts/verification/verify_bundle.py "${jars[0]}" --tag "$tag"
+          mkdir dist
+          name="$(basename "${jars[0]}" .jar)-${COMMIT}.jar"
+          cp "${jars[0]}" "dist/$name"
+          cmp "${jars[0]}" "dist/$name"
+          (cd dist && sha256sum "$name" > SHA256SUMS && sha256sum -c SHA256SUMS)
+      - name: Archive the verified bundle
+        id: upload
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: psecompass-${{ github.ref_type == 'tag' && github.ref_name || 'dev' }}-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+          archive: true
+
+  draft-release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact-id }}
+          path: dist
+          merge-multiple: true
+          digest-mismatch: error
+      - name: Create draft from the exact tested artifact (no rebuild)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum -c SHA256SUMS
+          jars=(*.jar)
+          [[ ${#jars[@]} == 1 && -f "${jars[0]}" ]]
+          prerelease=false
+          if [[ "$TAG" == *-* ]]; then prerelease=true; fi
+          gh release create "$TAG" "${jars[0]}" SHA256SUMS \
+            --verify-tag --target "$COMMIT" --draft --prerelease="$prerelease" \
+            --title "$TAG" \
+            --notes "Built from $COMMIT. Runtime acceptance on openHAB 5.2.4 is required before publication; see docs/RELEASING.md. No automatic deployment."
+          gh release view "$TAG" --json tagName,isDraft,isPrerelease,assets

@@ -1,13 +1,16 @@
-This content is produced and maintained by the openHAB project.
+PSE Energy Compass Binding is an independent community project.
+It is not produced or maintained by the openHAB project or by PSE.
 
-* Project home: https://www.openhab.org
+Project source: https://github.com/maniekes/openhab-binding-psecompass
 
-== Declared Project Licenses
+== License and provenance
 
-This program and the accompanying materials are made available under the terms
-of the Eclipse Public License 2.0 which is available at
-https://www.eclipse.org/legal/epl-2.0/.
+This program and the accompanying materials are made available under the
+Eclipse Public License 2.0: https://www.eclipse.org/legal/epl-2.0/.
+See LICENSE and the copyright notices in individual source files.
 
-== Source Code
+The binding follows openHAB conventions and incorporates openHAB-derived
+boilerplate. The original openHAB copyright and EPL-2.0 notices are retained.
+Upstream source: https://github.com/openhab/openhab-addons
 
-https://github.com/openhab/openhab-addons
+Platform libraries are supplied by openHAB at runtime, not embedded in this JAR.
